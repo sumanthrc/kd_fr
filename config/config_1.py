@@ -38,11 +38,6 @@ config.loss="ArcFace"  #  Option : ArcFace, CosFace, MLLoss
 config.network = "mobilefacenet" # iresnet100, iresnet50, iresnet18, mobilefacenet
 config.teacher = "Vit-B-KPRPE" # iresnet100, iresnet50, mobilefacenet, adaface_res50
 
-#--------- 1a. loading from Hugging Face  ----------------
-
-
-#####------------------------------------------------------------------------------######
-
 config.SE=False # SEModule
 
 
