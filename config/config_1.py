@@ -1,7 +1,7 @@
 from easydict import EasyDict as edict
 
 config = edict()
-config.dataset = "emoreIresNet" # training dataset
+config.dataset = "WEBFACE4M" # training dataset
 config.embedding_size = 512 # embedding size of model
 config.momentum = 0.9
 config.weight_decay = 5e-4
@@ -13,7 +13,7 @@ config.output = "output/" # train model output folder
 config.benchmarks = "datasets/test_datasets"
 
 # teacher path
-config.pretrained_teacher_path = "teacher/resnet50_arcfaceloss_ms1mv2_data_aug.pth" # teacher folder
+config.pretrained_teacher_path = "teacher/kprpe_vit_b.pt" # teacher folder
 #config.pretrained_teacher_header_path = "teacher/resnet50_ms1mv2_aug_2_12_08/295672header.pth" # teacher folder
 
 config.global_step=0# step to resume
@@ -24,27 +24,9 @@ config.m=0.45
 
 # AdaFace specific parameters
 #config.h=0.333
-#config.t_alpha=0.01
-config.use_adaface_aug = True          
-config.rec_root = "./datasets/train_datasets/faces_emore"
-config.train_rec = "faces_emore"       # folder name containing train.rec/idx/lst
-config.crop_aug_p = 0.2
-config.photo_aug_p = 0.2
-config.lowres_aug_p = 0.2
+#config.adaface_t_alpha=0.01
 
-
-#Aroface specific parameters
-#config.use_aroface_aug = True 
-#config.margin_list = (1.0, 0.5, 0.0)
-#config.sample_rate = 1
-#config.interclass_filtering_threshold = 0
-#config.eta_scale = 0.1
-#config.eta_t = 0.1
-#config.eta_theta = 0.1
-#config.ratio = 0.75
-
-
-#config.config_path = 'backbones/kprpe_models/vit_kprpe/configs/v1_base_kprpe_splithead_unshared.yaml'
+config.config_path = 'backbones/kprpe_models/vit_kprpe/configs/v1_base_kprpe_splithead_unshared.yaml'
 
 
 #AdaDistill configuration
@@ -54,8 +36,13 @@ config.loss="ArcFace"  #  Option : ArcFace, CosFace, MLLoss
 
 # type of network to train [iresnet100 | iresnet50 | iresnet18 | mobilefacenet | Transface_B]
 config.network = "mobilefacenet" # iresnet100, iresnet50, iresnet18, mobilefacenet
-config.teacher = "iresnet50" # iresnet100, iresnet50, mobilefacenet, adaface_res50
+config.teacher = "Vit-B-KPRPE" # iresnet100, iresnet50, mobilefacenet, adaface_res50
 
+#--------- 1a. loading from Hugging Face  ----------------
+#config.pretrained_teacher_path = "hf:minchul/cvlface_adaface_vit_base_kprpe_webface4m"  # minchul/cvlface_adaface_vit_base_kprpe_webface4m, cvlface_adaface_vit_base_webface4m
+#config.hf_token = "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"
+
+#####------------------------------------------------------------------------------######
 
 config.SE=False # SEModule
 

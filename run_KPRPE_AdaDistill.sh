@@ -11,7 +11,7 @@ torchrun \
   --standalone \
   --nnodes=1 \
   --nproc_per_node=$NGPUS \
-  train_standalone.py
+  train_Adadistill_KPRPE.py
 
 # optional cleanup
-pkill -f train_standalone.py || true
+pkill -f train_Adadistill_KPRPE.py || true

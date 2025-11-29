@@ -4,7 +4,7 @@ cfg = edict()
 
 # -------------------------------------------------------------------- #
 #  Basics
-cfg.model_path   = "output/45489backbone.pth"   # <- checkpoint to test
+cfg.model_path   = "output/resnet50_aug2_12_08/295672backbone.pth"   # <- checkpoint to test
 cfg.backbone     = "iresnet50"                    # iresnet18 / 50 / 100 / mobilefacenet
 cfg.image_size   = 112                            # input resolution
 cfg.rank         = 0                              # gpu index (0 for single-GPU)

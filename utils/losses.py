@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 import torch.distributed as dist
+import math
+from torch.nn import Module, Parameter
 
 def l2_norm(input, axis = 1):
     norm = torch.norm(input, 2, axis, True)
@@ -146,6 +148,99 @@ class AdaptiveAArcFace(nn.Module):
         cos_theta.cos_().mul_(self.s)
         return cos_theta , target_logit_mean.mean(), lam.mean(), cos_theta_tmp.mean()
 
+class AdaptiveAdaFace(Module):
+    def __init__(self,
+                 in_features,
+                 out_features,
+                 m=0.4,
+                 h=0.333,
+                 s=64.,
+                 t_alpha=1.0,
+                 adaptive_weighted_alpha=True,
+                 ):
+        super(AdaptiveAdaFace, self).__init__()
+        
+        self.kernel = Parameter(torch.Tensor(in_features,out_features))
+        self.adaptive_weighted_alpha=adaptive_weighted_alpha
+        self.cosine_sim=torch.nn.CosineSimilarity()
+        # initial kernel
+        self.kernel.data.uniform_(-1, 1).renorm_(2,1,1e-5).mul_(1e5)
+        self.m = m 
+        self.eps = 1e-3
+        self.h = h
+        self.s = s
+
+        # ema prep
+        self.t_alpha = t_alpha
+        self.register_buffer('t', torch.zeros(1))
+        self.register_buffer('batch_mean', torch.ones(1)*(20))
+        self.register_buffer('batch_std', torch.ones(1)*100)
+
+        print('\n\AdaFace with the following property')
+        print('self.m', self.m)
+        print('self.h', self.h)
+        print('self.s', self.s)
+        print('self.t_alpha', self.t_alpha)
+
+    def forward(self, embbedings, embbedings_t, norms, label):
+
+        embbedings = l2_norm(embbedings,axis=1)
+        embbedings_t = l2_norm(embbedings_t, axis=1)
+        with torch.no_grad():
+            cos_theta_tmp = self.cosine_sim(embbedings, embbedings_t)  # get alpha value
+            cos_theta_tmp = cos_theta_tmp.clamp(-1, 1)
+            if self.adaptive_weighted_alpha:  # weighted alpha
+                lam = self.cosine_sim(self.kernel[:, label].T, embbedings_t).clamp(1e-6, 1).view(-1, 1) # similarity between  teacher embeddings and class centers
+                target_logit = cos_theta_tmp.view(-1, 1) * lam
+            else:
+                    target_logit = cos_theta_tmp.view(-1, 1) - self.t_alpha
+            target_logit_mean = target_logit.clamp(1e-6, 1.0).T
+            self.kernel[:, label] = (target_logit_mean) * self.kernel[:, label] + (1. - target_logit_mean) * (embbedings_t.T)
+
+        kernel_norm = l2_norm(self.kernel,axis=0)
+        cosine = torch.mm(embbedings,kernel_norm)
+        cosine = cosine.clamp(-1+self.eps, 1-self.eps) # for stability
+        safe_norms = torch.clip(norms, min=0.001, max=100) # for stability
+        safe_norms = safe_norms.clone().detach()
+
+        # update batchmean batchstd
+        with torch.no_grad():
+            mean = safe_norms.mean().detach()
+            std = safe_norms.std().detach()
+            self.batch_mean = mean * self.t_alpha + (1 - self.t_alpha) * self.batch_mean
+            self.batch_std =  std * self.t_alpha + (1 - self.t_alpha) * self.batch_std
+
+        margin_scaler = (safe_norms - self.batch_mean) / (self.batch_std+self.eps) # 66% between -1, 1
+        margin_scaler = margin_scaler * self.h # 68% between -0.333 ,0.333 when h:0.333
+        margin_scaler = torch.clip(margin_scaler, -1, 1)
+        # ex: m=0.5, h:0.333
+        # range
+        #       (66% range)
+        #   -1 -0.333  0.333   1  (margin_scaler)
+        # -0.5 -0.166  0.166 0.5  (m * margin_scaler)
+
+        # g_angular
+        m_arc = torch.zeros(label.size()[0], cosine.size()[1], device=cosine.device)
+        m_arc.scatter_(1, label.reshape(-1, 1), 1.0)
+        #print("Shape of m_arc:", m_arc.shape)
+        
+        g_angular = (self.m * margin_scaler * -1).view(-1, 1) #g_angular = self.m * margin_scaler * -1
+        #print("Shape of g_angular:", g_angular.shape)
+        m_arc = m_arc * g_angular
+        theta = cosine.acos()
+        theta_m = torch.clip(theta + m_arc, min=self.eps, max=math.pi-self.eps)
+        cosine = theta_m.cos()
+
+        # g_additive
+        m_cos = torch.zeros(label.size()[0], cosine.size()[1], device=cosine.device)
+        m_cos.scatter_(1, label.reshape(-1, 1), 1.0)
+        g_add = (self.m + self.m * margin_scaler).view(-1, 1) #g_add = self.m + (self.m * margin_scaler)
+        m_cos = m_cos * g_add
+        cosine = cosine - m_cos
+
+        # scale
+        scaled_cosine_m = cosine * self.s
+        return scaled_cosine_m, target_logit_mean.mean(), lam.mean(), cos_theta_tmp.mean()
 
 @torch.no_grad()
 def all_gather_tensor(input_tensor, dim=0):
@@ -189,5 +284,4 @@ class ArcFace(nn.Module):
         cos_theta[index] += m_hot
         cos_theta.cos_().mul_(self.s)
         return cos_theta
-
-
+    

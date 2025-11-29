@@ -6,6 +6,15 @@ from backbones.mobilefacenet import MobileFaceNet
 from evaluation_code.validate_ijb import ijb_eval
 from evaluation_code.validate_tinyface import tinyface_eval
 
+
+
+def _build_adaface_res50():
+    model = net.build_model('ir_50')
+    checkpoint = torch.load("teacher/adaface_ir50_ms1mv2.pth", map_location=f"cuda:{cfg.rank}")
+    statedict = checkpoint["state_dict"]
+    model_statedict = {key[6:]: val for key, val in statedict.items() if key.startswith("model.")}
+    model.load_state_dict(model_statedict)
+    return model
 # --------- 1.  Build backbone -------------------------------------------------
 if cfg.backbone.startswith("iresnet"):
     builder = dict(iresnet18=iresnet18, iresnet50=iresnet50,
@@ -14,6 +23,7 @@ if cfg.backbone.startswith("iresnet"):
 elif cfg.backbone == "mobilefacenet":
     net = MobileFaceNet(input_size=(cfg.image_size, cfg.image_size)
                        ).to(f"cuda:{cfg.rank}")
+elif cfg.backbone == "adaface_res50": net = _build_adaface_res50()
 else:
     sys.exit(f"Unsupported backbone: {cfg.backbone}")
 

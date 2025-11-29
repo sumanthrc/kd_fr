@@ -1,0 +1,29 @@
+# Model weights and checkpoints
+*.pth
+*.pt
+*.ckpt
+
+# Large dataset folders
+faces_webface_112x112/
+faces_webface_112x112_idx/
+A_validation_logs/
+output/
+teacher/
+results/
+datasets/
+train_datasets/
+eval_datasets/
+
+# Logs
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# VSCode settings
+.vscode/
+.vscode-server/
+
+# System files
+.DS_Store
