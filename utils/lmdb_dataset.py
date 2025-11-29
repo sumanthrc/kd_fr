@@ -150,14 +150,21 @@ class LmdbDataset(torch.utils.data.Dataset):
         lmdb_file: Union[str, os.PathLike],
         transforms: Union[torch.nn.Module, torchvision.transforms.Compose, None] = None,
         lmdb_handler: Union[LmdbHandler, None] = None,
+        use_grid_sampler: bool = False,
+        aug_params: Union[dict, None] = None,
     ):
         self._lmdb_file = lmdb_file
         self._transforms = transforms
         self.handler = LmdbHandler(lmdb_file) if lmdb_handler is None else lmdb_handler
+        self.use_grid_sampler = use_grid_sampler
 
         self.length = int(pickle.loads(self.handler.get(b"__len__")))
         self.keys = pickle.loads(self.handler.get(b"__keys__"))
         self.labels = pickle.loads(self.handler.get(b"__labels__"))
+
+        if self.use_grid_sampler and aug_params is not None:
+            from data_aug_grid_sampler import GridSampleAugmenter
+            self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
 
 
     def __len__(self) -> int:
@@ -187,13 +194,25 @@ class LmdbDataset(torch.utils.data.Dataset):
         image_bytes = io.BytesIO(image_bytes)
         image_tensor = TF.pil_to_tensor(Image.open(image_bytes))
 
-        if self._transforms:
-            image_tensor = self._transforms(image_tensor)
+        if self.use_grid_sampler:
+            image_pil = TF.to_pil_image(image_tensor) #convert tensor to pil image
+            image_aug, theta = self.grid_augmenter.augment(image_pil)
+            image_tensor = TF.pil_to_tensor(image_aug) #convert back to tensor
+        
+            if self._transforms:
+                image_tensor = self._transforms(image_tensor)
 
-        label = self.labels[index]
-        label = torch.tensor(label, dtype=torch.long)
-
-        return image_tensor, label
+            label = self.labels[index]
+            label = torch.tensor(label, dtype=torch.long)
+            return image_tensor, label, theta
+        else:
+            #original pipeline without grid sampler data augmentation
+            if self._transforms:
+                image_tensor = self._transforms(image_tensor)
+            label = self.labels[index]
+            label = torch.tensor(label, dtype=torch.long)
+            return image_tensor, label
+        
 
     @staticmethod
     def _create_database_from_image_folder(

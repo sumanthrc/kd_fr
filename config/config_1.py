@@ -13,7 +13,7 @@ config.output = "output/" # train model output folder
 config.benchmarks = "datasets/test_datasets"
 
 # teacher path
-config.pretrained_teacher_path = "teacher/kprpe_vit_b.pt" # teacher folder
+config.pretrained_teacher_path = "teacher/vit_b_webface4m.pt" # teacher folder
 #config.pretrained_teacher_header_path = "teacher/resnet50_ms1mv2_aug_2_12_08/295672header.pth" # teacher folder
 
 config.global_step=0# step to resume
@@ -26,8 +26,13 @@ config.m=0.45
 #config.h=0.333
 #config.adaface_t_alpha=0.01
 
-config.config_path = 'backbones/kprpe_models/vit_kprpe/configs/v1_base_kprpe_splithead_unshared.yaml'
+                        # ----------------Vit_B_KPRPE backbone configuration ------------------
 
+#config.config_path = 'backbones/kprpe_models/vit_kprpe/configs/v1_base_kprpe_splithead_unshared.yaml'
+
+                        #----------------Vit_B backbone configuration ------------------
+
+config.vit_config_path = 'backbones/kprpe_models/vit/configs/v1_base.yaml'
 
 #AdaDistill configuration
 config.adaptive_alpha=True
@@ -36,10 +41,26 @@ config.loss="ArcFace"  #  Option : ArcFace, CosFace, MLLoss
 
 # type of network to train [iresnet100 | iresnet50 | iresnet18 | mobilefacenet | Transface_B]
 config.network = "mobilefacenet" # iresnet100, iresnet50, iresnet18, mobilefacenet
-config.teacher = "Vit-B-KPRPE" # iresnet100, iresnet50, mobilefacenet, adaface_res50
+config.teacher = "Vit_b" # iresnet100, iresnet50, mobilefacenet, adaface_res50
 
 config.SE=False # SEModule
 
+#-------------------- Grid sampler augmentation parameters ------------------
+config.use_grid_sampler = True
+config.grid_sampler_aug_params = { 
+              'scale_min': 0.8,
+              'scale_max': 1.2,
+              'rot_prob': 0.2,
+              'max_rot': 20,
+              'hflip_prob': 0.5,
+              'extra_offset': 0.1,
+              'photometric_num_ops': 2,
+              'photometric_magnitude': 14,
+              'photometric_magnitude_offset': 9,
+              'photometric_num_magnitude_bins': 31,
+              'blur_magnitude': 1.0,
+              'blur_prob': 0.2,
+              'cutout_prob': 0.2,}
 
 if config.dataset == "emoreIresNet":
     config.rec = "./datasets/train_datasets/faces_emore"

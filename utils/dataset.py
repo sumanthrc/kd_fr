@@ -9,6 +9,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 import cv2
+from PIL import Image
 
 from utils.rand_augment import RandAugment
 
@@ -72,8 +73,12 @@ class DataLoaderX(DataLoader):
 
 
 class MXFaceDataset(Dataset):
-    def __init__(self, root_dir, local_rank):
+    def __init__(self, root_dir, local_rank, use_grid_sampler=False, aug_params=None):
         super(MXFaceDataset, self).__init__()
+        self.use_grid_sampler = use_grid_sampler
+        if self.use_grid_sampler and aug_params is not None:
+            from data_aug_grid_sampler import GridSampleAugmenter
+            self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
         self.transform = transforms.Compose(
             [transforms.ToPILImage(),
              transforms.RandomHorizontalFlip(),
@@ -102,9 +107,15 @@ class MXFaceDataset(Dataset):
             label = label[0]
         label = torch.tensor(label, dtype=torch.long)
         sample = mx.image.imdecode(img).asnumpy()
-        if self.transform is not None:
-            sample = self.transform(sample)
-        return sample, label
+        if self.use_grid_sampler:
+            sample_pil = Image.fromarray(sample)
+            sample_aug, theta = self.grid_augmenter.augment(sample_pil)
+            sample = self.transform(sample_aug)
+            return sample, label, theta
+        else:
+            if self.transform is not None:
+                sample = self.transform(sample)
+            return sample, label
 
     def __len__(self):
         return len(self.imgidx)

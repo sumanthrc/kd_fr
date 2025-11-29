@@ -20,6 +20,9 @@ from utils.utils_callbacks import CallBackVerification, CallBackLogging, CallBac
 from utils.utils_logging import AverageMeter, init_logging
 
 from backbones.iresnet import iresnet100, iresnet50, iresnet18
+from backbones.kprpe_models.vit import load_model as load_vit_model #to load vit_b_ teacher
+from utils.lmdb_dataset import LmdbDataset # load lmdb dataset
+from omegaconf import OmegaConf
 
 #imports realted to adaface augmentation
 from utils.adaface_data_aug.record_dataset import AugmentRecordDataset
@@ -33,6 +36,10 @@ from utils.Aroface_data_aug.aroface_losses import CombinedMarginLoss
 
 
 torch.backends.cudnn.benchmark = True
+
+def load_config(config_path):
+    cfg = OmegaConf.load(config_path) # load config from yaml file using omegaconf
+    return cfg
 
 
 def main(args):
@@ -67,10 +74,20 @@ def main(args):
             swap_color_channel=False,
         )
     else:
-        if ( cfg.db_file_format !="rec"):
+
+        if cfg.dataset == "WEBFACE4M":
+            tfm = transforms.Compose([
+                #transforms.Resize((112,112)),             # keep if your LMDB isn’t already 112×112
+                transforms.RandomHorizontalFlip(),
+                transforms.ConvertImageDtype(torch.float32),
+                transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5]),
+        ])
+            trainset = LmdbDataset(lmdb_file=cfg.lmdb_path, transforms=tfm, use_grid_sampler=cfg.use_grid_sampler, aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None)
+
+        elif ( cfg.db_file_format !="rec"):
             trainset = FaceDatasetFolder(root_dir=cfg.data_path, local_rank=local_rank,number_sample=cfg.sample)
         else:
-            trainset = MXFaceDataset(root_dir=cfg.rec, local_rank=local_rank)
+            trainset = MXFaceDataset(root_dir=cfg.rec, local_rank=local_rank, use_grid_sampler=cfg.use_grid_sampler, aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None)
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(
         trainset, shuffle=True)
@@ -99,6 +116,9 @@ def main(args):
             local_rank)
     elif cfg.teacher == "adaface_res50":
         backbone_t = _build_adaface_res50().to(local_rank)
+    elif cfg.teacher == "Vit_b":
+        vit_config = load_config(cfg.vit_config_path)
+        backbone_t = load_vit_model(vit_config).to(local_rank)
 
     # Student model
     if cfg.network== "mobilefacenet":
@@ -212,10 +232,17 @@ def main(args):
     global_step = cfg.global_step
     for epoch in range(start_epoch, cfg.num_epoch):
         train_sampler.set_epoch(epoch)
-        for _, (img, label) in enumerate(train_loader):
+        for _, (batch) in enumerate(train_loader):
             global_step += 1
+
+            if cfg.use_grid_sampler:
+                img, label, theta = batch
+            else:
+                img, label = batch
+
             img = img.cuda(local_rank, non_blocking=True)
             label = label.cuda(local_rank, non_blocking=True)
+            
             if getattr(cfg, "use_aroface_aug", False):
                 img, label = adversarial_img_warping(
                 backbone=backbone,
