@@ -39,8 +39,7 @@ config.network = "mobilefacenet" # iresnet100, iresnet50, iresnet18, mobilefacen
 config.teacher = "Vit-B-KPRPE" # iresnet100, iresnet50, mobilefacenet, adaface_res50
 
 #--------- 1a. loading from Hugging Face  ----------------
-#config.pretrained_teacher_path = "hf:minchul/cvlface_adaface_vit_base_kprpe_webface4m"  # minchul/cvlface_adaface_vit_base_kprpe_webface4m, cvlface_adaface_vit_base_webface4m
-#config.hf_token = "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"
+
 
 #####------------------------------------------------------------------------------######
 
