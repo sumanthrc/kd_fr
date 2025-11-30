@@ -1,6 +1,6 @@
 import numpy as np
-from data_augs.aug_utils import transform_torch
-from data_augs.aug_utils import transform_cv2
+from .aug_utils import transform_torch
+from .aug_utils import transform_cv2
 from PIL import Image
 from PIL import ImageDraw
 import torch

@@ -22,6 +22,7 @@ import lmdb
 
 from PIL import Image
 from typing import Union
+import pandas as pd
 
 
 class LmdbHandler:
@@ -152,18 +153,24 @@ class LmdbDataset(torch.utils.data.Dataset):
         lmdb_handler: Union[LmdbHandler, None] = None,
         use_grid_sampler: bool = False,
         aug_params: Union[dict, None] = None,
+        landmark_csv: Union[str, None] = None,
     ):
         self._lmdb_file = lmdb_file
         self._transforms = transforms
         self.handler = LmdbHandler(lmdb_file) if lmdb_handler is None else lmdb_handler
         self.use_grid_sampler = use_grid_sampler
+        self.landmark_csv = landmark_csv
+        self.ldmk_info = None
 
         self.length = int(pickle.loads(self.handler.get(b"__len__")))
         self.keys = pickle.loads(self.handler.get(b"__keys__"))
         self.labels = pickle.loads(self.handler.get(b"__labels__"))
+        
+        if self.landmark_csv and os.path.exists(self.landmark_csv):
+            self.ldmk_info = pd.read_csv(self.landmark_csv, sep=',', index_col=0)
 
         if self.use_grid_sampler and aug_params is not None:
-            from data_aug_grid_sampler import GridSampleAugmenter
+            from utils.data_aug_grid_sampler import GridSampleAugmenter
             self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
 
 
@@ -193,6 +200,21 @@ class LmdbDataset(torch.utils.data.Dataset):
 
         image_bytes = io.BytesIO(image_bytes)
         image_tensor = TF.pil_to_tensor(Image.open(image_bytes))
+        
+        landmark = None
+        if self.ldmk_info is not None:
+             try:
+                 # LmdbDataset keys might not be simple indices. 
+                 # But predict_landmark.py uses enumerate index.
+                 # If LmdbDataset keys are just indices encoded as bytes (which they seem to be in _create_database...), then index should work.
+                 # keys = ["{}".format(k).encode("ascii") for k in range(len(files))]
+                 # So keys[index] is the key for the item at index.
+                 # But predict_landmark.py writes 'idx' as the loop index.
+                 # So we can just use `index`.
+                 ldmk_vals = self.ldmk_info.loc[index].values 
+                 landmark = torch.from_numpy(ldmk_vals.reshape(-1, 2)).float()
+             except KeyError:
+                 pass
 
         if self.use_grid_sampler:
             image_pil = TF.to_pil_image(image_tensor) #convert tensor to pil image
@@ -204,6 +226,11 @@ class LmdbDataset(torch.utils.data.Dataset):
 
             label = self.labels[index]
             label = torch.tensor(label, dtype=torch.long)
+            
+            if landmark is not None:
+                 landmark = self.transform_ldmk(landmark, theta)
+                 return image_tensor, label, theta, landmark
+            
             return image_tensor, label, theta
         else:
             #original pipeline without grid sampler data augmentation
@@ -211,8 +238,42 @@ class LmdbDataset(torch.utils.data.Dataset):
                 image_tensor = self._transforms(image_tensor)
             label = self.labels[index]
             label = torch.tensor(label, dtype=torch.long)
+            
+            if landmark is not None:
+                return image_tensor, label, torch.zeros(2,3), landmark
+                
             return image_tensor, label
         
+
+    def transform_ldmk(self, ldmk, theta):
+        inv_theta = self.inv_matrix(theta.unsqueeze(0)).squeeze(0)
+        ldmk = torch.cat([ldmk, torch.ones(ldmk.shape[0], 1)], dim=1).float()
+        transformed_ldmk = (((ldmk) * 2 - 1) @ inv_theta.T) / 2 + 0.5
+        if inv_theta[0, 0] < 0:
+            transformed_ldmk = self.mirror_ldmk(transformed_ldmk)
+        return transformed_ldmk
+
+    def mirror_ldmk(self, ldmk):
+        new_ldmk = ldmk.clone()
+        tmp = new_ldmk[1, :].clone()
+        new_ldmk[1, :] = new_ldmk[0, :]
+        new_ldmk[0, :] = tmp
+        tmp1 = new_ldmk[4, :].clone()
+        new_ldmk[4, :] = new_ldmk[3, :]
+        new_ldmk[3, :] = tmp1
+        return new_ldmk
+
+    def inv_matrix(self, theta):
+        assert theta.ndim == 3
+        a, b, t1 = theta[:, 0,0], theta[:, 0,1], theta[:, 0,2]
+        c, d, t2 = theta[:, 1,0], theta[:, 1,1], theta[:, 1,2]
+        det = a * d - b * c
+        inv_det = 1.0 / det
+        inv_mat = torch.stack([
+            torch.stack([d * inv_det, -b * inv_det, (b * t2 - d * t1) * inv_det], dim=1),
+            torch.stack([-c * inv_det, a * inv_det, (c * t1 - a * t2) * inv_det], dim=1)
+        ], dim=1)
+        return inv_mat
 
     @staticmethod
     def _create_database_from_image_folder(

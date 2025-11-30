@@ -1,0 +1,44 @@
+# Experiment: WebFace4M with ViT Teacher and Grid Sampler
+
+# Dataset
+dataset: "WEBFACE4M"
+lmdb_path: "./datasets/train_datasets/webface4m_112x112.lmdb_dataset"
+
+# Model
+network: "mobilefacenet"
+embedding_size: 512
+
+# Teacher
+teacher: "Vit_b_kprpe"
+pretrained_teacher_path: "teacher/vit_b_webface4m.pt"
+vit_config_path: "backbones/kprpe_models/vit_kprpe/configs/v1_base_kprpe_splithead_unshared.yaml"
+aligner_config_path: "aligners/configs/dfa.yaml"
+landmark_csv: "./datasets/train_datasets/webface4m_112x112.lmdb_dataset/landmark.csv"
+
+# Loss
+loss: "ArcFace"
+s: 64.0
+m: 0.45
+
+# Augmentation
+use_adaface_aug: false  # Disable AdaFace aug to use Grid Sampler
+use_grid_sampler: true
+grid_sampler_aug_params:
+  scale_min: 0.8
+  scale_max: 1.2
+  rot_prob: 0.2
+  max_rot: 20
+  hflip_prob: 0.5
+  extra_offset: 0.1
+  photometric_num_ops: 2
+  photometric_magnitude: 14
+  photometric_magnitude_offset: 9
+  photometric_num_magnitude_bins: 31
+  blur_magnitude: 1.0
+  blur_prob: 0.2
+  cutout_prob: 0.2
+
+# Training
+batch_size: 128
+lr: 0.1
+num_epoch: 26
