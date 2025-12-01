@@ -24,6 +24,8 @@ from PIL import Image
 from typing import Union
 import pandas as pd
 
+from .data_aug_grid_sampler import GridSampleAugmenter
+
 
 class LmdbHandler:
 
@@ -170,7 +172,6 @@ class LmdbDataset(torch.utils.data.Dataset):
             self.ldmk_info = pd.read_csv(self.landmark_csv, sep=',', index_col=0)
 
         if self.use_grid_sampler and aug_params is not None:
-            from utils.data_aug_grid_sampler import GridSampleAugmenter
             self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
 
 

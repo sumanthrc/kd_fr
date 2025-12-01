@@ -13,6 +13,7 @@ from PIL import Image
 import pandas as pd
 
 from utils.rand_augment import RandAugment
+from .data_aug_grid_sampler import GridSampleAugmenter
 
 
 class BackgroundGenerator(threading.Thread):
@@ -84,7 +85,6 @@ class MXFaceDataset(Dataset):
             self.ldmk_info = pd.read_csv(self.landmark_csv, sep=',', index_col=0)
 
         if self.use_grid_sampler and aug_params is not None:
-            from utils.data_aug_grid_sampler import GridSampleAugmenter
             self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
             
         self.transform = transforms.Compose(
