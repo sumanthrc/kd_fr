@@ -1,7 +1,7 @@
 from easydict import EasyDict as edict
 
 config = edict()
-config.dataset = "WEBFACE4M" # training dataset
+config.dataset = "REPEATED_WEBFACE4M" # training dataset
 config.embedding_size = 512 # embedding size of model
 config.momentum = 0.9
 config.weight_decay = 5e-4
@@ -118,4 +118,26 @@ if config.dataset == "WEBFACE4M":
     def lr_step_func(epoch):
         return ((epoch + 1) / (4 + 1)) ** 2 if epoch < -1 else 0.1 ** len(
             [m for m in [8, 14,20,25] if m - 1 <= epoch])  # [m for m in [8, 14,20,25] if m - 1 <= epoch])
+    config.lr_func = lr_step_func
+
+if config.dataset == "REPEATED_WEBFACE4M":
+    config.lmdb_path = "./datasets/train_datasets/webface4m_112x112.lmdb_dataset"
+    config.landmark_path = "./datasets/train_datasets/webface4m_112x112_landmarks.csv"
+    config.num_classes = 205990
+    config.num_image = 4235242
+    config.num_epoch =  26
+    config.warmup_epoch = -1
+    config.val_targets =  ["lfw", "cfp_fp", "cfp_ff", "agedb_30", "calfw", "cplfw"]
+    config.eval_step=5686
+    
+    # Repeated dataset specific
+    config.repeated_augment_prob = 0.1
+    config.use_same_image = False
+    config.second_img_augment = False
+    config.disable_repeat = True
+    config.skip_aug_prob_in_disable_repeat = 0.0
+    
+    def lr_step_func(epoch):
+        return ((epoch + 1) / (4 + 1)) ** 2 if epoch < -1 else 0.1 ** len(
+            [m for m in [8, 14,20,25] if m - 1 <= epoch])
     config.lr_func = lr_step_func

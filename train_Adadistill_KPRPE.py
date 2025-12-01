@@ -28,6 +28,9 @@ from backbones.kprpe_models.vit_kprpe import load_model
 from omegaconf import OmegaConf
 from aligners import get_aligner
 
+from utils.repeated_dataset_with_ldmk_theta import RepeatedLmdbDataset as RepeatedLdmkDataset
+
+
 torch.backends.cudnn.benchmark = True
 
 def load_config(config_path):
@@ -59,6 +62,17 @@ def main(args):
             transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5]),
         ])
         trainset = LmdbDataset(lmdb_file=cfg.lmdb_path, transforms=tfm)
+    elif cfg.dataset == "REPEATED_WEBFACE4M":
+        trainset = RepeatedLdmkDataset(
+            lmdb_file=cfg.lmdb_path,
+            landmark_path=cfg.landmark_path,
+            aug_params=cfg.grid_sampler_aug_params if hasattr(cfg, 'use_grid_sampler') and cfg.use_grid_sampler else None,
+            repeated_augment_prob=cfg.repeated_augment_prob,
+            use_same_image=cfg.use_same_image,
+            disable_repeat=cfg.disable_repeat,
+            skip_aug_prob_in_disable_repeat=cfg.skip_aug_prob_in_disable_repeat,
+            second_img_augment=cfg.second_img_augment
+        )
     else:
         trainset = FaceDatasetFolder(root_dir=cfg.data_path, local_rank=local_rank, number_sample=cfg.sample)
 
@@ -183,14 +197,45 @@ def main(args):
     global_step = cfg.global_step
     for epoch in range(start_epoch, cfg.num_epoch):
         train_sampler.set_epoch(epoch)
-        for _, (img, label) in enumerate(train_loader):
+        for _, batch in enumerate(train_loader):
             global_step += 1
-            img = img.cuda(local_rank, non_blocking=True)
-            label = label.cuda(local_rank, non_blocking=True)
-            with torch.no_grad():
-                aligned_x, orig_ldmks, aligned_ldmks, score, theta, bbox = aligner(img)
-                kps = aligned_ldmks.cuda(local_rank, non_blocking=True)
-                aligned_x = aligned_x.cuda(local_rank, non_blocking=True) 
+            
+            # Default values
+            kps = None
+            
+            if cfg.dataset == "REPEATED_WEBFACE4M":
+                # Unpack batch from RepeatedLdmkDataset
+                # Returns: sample1, target, ldmk1, theta1, sample2, ldmk2, theta2
+                img1, label, ldmk1, theta1, img2, ldmk2, theta2 = batch
+                
+                if cfg.disable_repeat:
+                     # Only use first sample
+                     img = img1
+                     kps = ldmk1
+                else:
+                     # Stack samples
+                     img = torch.cat([img1, img2], dim=0)
+                     label = torch.cat([label, label], dim=0)
+                     kps = torch.cat([ldmk1, ldmk2], dim=0)
+                     # theta = torch.cat([theta1, theta2], dim=0) # If needed for logging
+                
+                img = img.cuda(local_rank, non_blocking=True)
+                label = label.cuda(local_rank, non_blocking=True)
+                kps = kps.cuda(local_rank, non_blocking=True)
+                
+                # Bypass aligner, use offline landmarks (kps)
+                aligned_x = img # Already aligned/augmented by dataset
+                
+            else:
+                img, label = batch
+                img = img.cuda(local_rank, non_blocking=True)
+                label = label.cuda(local_rank, non_blocking=True)
+                
+                with torch.no_grad():
+                    aligned_x, orig_ldmks, aligned_ldmks, score, theta, bbox = aligner(img)
+                    kps = aligned_ldmks.cuda(local_rank, non_blocking=True)
+                    aligned_x = aligned_x.cuda(local_rank, non_blocking=True) 
+            
             features = backbone(aligned_x)
             with torch.no_grad():
                 features_t=backbone_t(aligned_x,keypoints=kps)

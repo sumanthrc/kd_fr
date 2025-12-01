@@ -198,6 +198,7 @@ class LmdbDataset(torch.utils.data.Dataset):
             image_pil = TF.to_pil_image(image_tensor) #convert tensor to pil image
             image_aug, theta = self.grid_augmenter.augment(image_pil)
             image_tensor = TF.pil_to_tensor(image_aug) #convert back to tensor
+            assert theta.shape == (2,3) #theta should be 2x3 matrix
         
             if self._transforms:
                 image_tensor = self._transforms(image_tensor)

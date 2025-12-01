@@ -22,6 +22,7 @@ from utils.utils_logging import AverageMeter, init_logging
 from backbones.iresnet import iresnet100, iresnet50, iresnet18
 from backbones.kprpe_models.vit import load_model as load_vit_model #to load vit_b_ teacher
 from utils.lmdb_dataset import LmdbDataset # load lmdb dataset
+from utils.repeated_dataset import RepeatedLmdbDataset
 from omegaconf import OmegaConf
 
 #imports realted to adaface augmentation
@@ -83,6 +84,17 @@ def main(args):
                 transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5]),
         ])
             trainset = LmdbDataset(lmdb_file=cfg.lmdb_path, transforms=tfm, use_grid_sampler=cfg.use_grid_sampler, aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None)
+
+        elif cfg.dataset == "REPEATED_WEBFACE4M":
+             trainset = RepeatedLmdbDataset(
+                lmdb_file=cfg.lmdb_path,
+                aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None,
+                repeated_augment_prob=cfg.repeated_augment_prob,
+                use_same_image=cfg.use_same_image,
+                disable_repeat=cfg.disable_repeat,
+                skip_aug_prob_in_disable_repeat=cfg.skip_aug_prob_in_disable_repeat,
+                second_img_augment=cfg.second_img_augment
+            )
 
         elif ( cfg.db_file_format !="rec"):
             trainset = FaceDatasetFolder(root_dir=cfg.data_path, local_rank=local_rank,number_sample=cfg.sample)
@@ -236,7 +248,17 @@ def main(args):
             global_step += 1
 
             if cfg.use_grid_sampler:
-                img, label, theta = batch
+                if cfg.dataset == "REPEATED_WEBFACE4M":
+                    # Unpack repeated dataset return values
+                    # Returns: sample1, sample2, target, theta1, theta2
+                    img1, img2, label, theta1, theta2 = batch
+                    
+                    # Stack images and thetas to double the batch size
+                    img = torch.cat([img1, img2], dim=0)
+                    theta = torch.cat([theta1, theta2], dim=0)
+                    label = torch.cat([label, label], dim=0)
+                else:
+                    img, label, theta = batch
             else:
                 img, label = batch
 
