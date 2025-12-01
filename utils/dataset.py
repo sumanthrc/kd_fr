@@ -12,6 +12,7 @@ import cv2
 from PIL import Image
 
 from utils.rand_augment import RandAugment
+from .data_aug_grid_sampler import GridSampleAugmenter
 
 
 class BackgroundGenerator(threading.Thread):
@@ -77,7 +78,6 @@ class MXFaceDataset(Dataset):
         super(MXFaceDataset, self).__init__()
         self.use_grid_sampler = use_grid_sampler
         if self.use_grid_sampler and aug_params is not None:
-            from data_aug_grid_sampler import GridSampleAugmenter
             self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
         self.transform = transforms.Compose(
             [transforms.ToPILImage(),

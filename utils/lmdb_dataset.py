@@ -22,6 +22,7 @@ import lmdb
 
 from PIL import Image
 from typing import Union
+from .data_aug_grid_sampler import GridSampleAugmenter
 
 
 class LmdbHandler:
@@ -163,7 +164,6 @@ class LmdbDataset(torch.utils.data.Dataset):
         self.labels = pickle.loads(self.handler.get(b"__labels__"))
 
         if self.use_grid_sampler and aug_params is not None:
-            from data_aug_grid_sampler import GridSampleAugmenter
             self.grid_augmenter = GridSampleAugmenter(aug_params, input_size=112)
 
 
