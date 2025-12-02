@@ -109,7 +109,12 @@ class RepeatedLmdbDataset(LmdbDataset):
             # If sample2 not augmented, theta2 remains dummy.
             
             if theta2 is None:
-                theta2 = torch.tensor([0]) # Dummy
+                # Create identity matrix matching theta1's dtype
+                theta2 = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]], dtype=theta1.dtype)
+            
+            # Debug: Check shapes before returning
+            print(f"[DEBUG] theta1 shape: {theta1.shape}, type: {type(theta1)}, dtype: {theta1.dtype if isinstance(theta1, torch.Tensor) else 'N/A'}")
+            print(f"[DEBUG] theta2 shape: {theta2.shape}, type: {type(theta2)}, dtype: {theta2.dtype if isinstance(theta2, torch.Tensor) else 'N/A'}")
                 
             return sample1, sample2, target, theta1, theta2
         else:
