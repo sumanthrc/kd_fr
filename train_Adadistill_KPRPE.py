@@ -63,8 +63,15 @@ def main(args):
         ])
         trainset = LmdbDataset(lmdb_file=cfg.lmdb_path, transforms=tfm)
     elif cfg.dataset == "REPEATED_WEBFACE4M":
+        tfm = transforms.Compose([
+            #transforms.Resize((112,112)),             # keep if your LMDB isn’t already 112×112
+            transforms.RandomHorizontalFlip(),
+            transforms.ConvertImageDtype(torch.float32),
+            transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5]),
+        ])
         trainset = RepeatedLdmkDataset(
             lmdb_file=cfg.lmdb_path,
+            transforms=tfm,
             landmark_path=cfg.landmark_path,
             aug_params=cfg.grid_sampler_aug_params if hasattr(cfg, 'use_grid_sampler') and cfg.use_grid_sampler else None,
             repeated_augment_prob=cfg.repeated_augment_prob,
