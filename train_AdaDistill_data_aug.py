@@ -86,8 +86,14 @@ def main(args):
             trainset = LmdbDataset(lmdb_file=cfg.lmdb_path, transforms=tfm, use_grid_sampler=cfg.use_grid_sampler, aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None)
 
         elif cfg.dataset == "REPEATED_WEBFACE4M":
-             trainset = RepeatedLmdbDataset(
+            tfm = transforms.Compose([
+                transforms.RandomHorizontalFlip(),
+                transforms.ConvertImageDtype(torch.float32),
+                transforms.Normalize(mean=[0.5,0.5,0.5], std=[0.5,0.5,0.5]),
+            ])
+            trainset = RepeatedLmdbDataset(
                 lmdb_file=cfg.lmdb_path,
+                transforms=tfm,
                 aug_params=cfg.grid_sampler_aug_params if cfg.use_grid_sampler else None,
                 repeated_augment_prob=cfg.repeated_augment_prob,
                 use_same_image=cfg.use_same_image,
