@@ -11,7 +11,7 @@ torchrun \
   --standalone \
   --nnodes=1 \
   --nproc_per_node=$NGPUS \
-  predict_landmarks.py
+  predict_landmarks.py \
   --lmdb_path "./datasets/train_datasets/webface4m_112x112.lmdb_dataset" \
   --save_name "./output/webface4m_112x112_landmarks.csv" \
   --batch_size 128 \
